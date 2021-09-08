@@ -25,6 +25,7 @@ func (plugin Gitlab) Execute(options map[string]interface{}, progress chan<- flo
 		logger.Print("boardId is invalid")
 		return
 	}
+
 	c := make(chan bool)
 	go func() {
 		err := tasks.CollectProjects(projectIdInt, c)
@@ -34,11 +35,14 @@ func (plugin Gitlab) Execute(options map[string]interface{}, progress chan<- flo
 		}
 	}()
 	<-c
+
 	err := tasks.CollectCommits(projectIdInt)
 	if err != nil {
 		logger.Error("Could not collect commits: ", err)
 		return
 	}
+
+	logger.Info("JON >>> commits done", true)
 
 	mergeRequestErr := tasks.CollectMergeRequests(projectIdInt)
 	if mergeRequestErr != nil {

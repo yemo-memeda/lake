@@ -113,7 +113,8 @@ func (gitlabApiClient *GitlabApiClient) FetchWithPaginationAnts(resourceUri stri
 
 	// not all api return x-total header, use step concurrency
 	if total == -1 {
-		conc := 10
+		// Since the rate limit would put us at the max, we want to offset it to not hit the limit
+		conc := rateLimitPerSecond - 2 // approx: 25
 		step := 0
 		c := make(chan bool)
 		for {
@@ -133,8 +134,9 @@ func (gitlabApiClient *GitlabApiClient) FetchWithPaginationAnts(resourceUri stri
 					}
 					_, err = strconv.ParseInt(res.Header.Get("X-Next-Page"), 10, 32)
 					if err != nil { // any page in current step has no next, stop
+						logger.Info("JON >>> err, stop the loop", err)
 						c <- false
-					} else if page%conc == 0 { // last page has next, go go go
+					} else if page%conc == 0 { // last page has X-Next-Page, go go go
 						fmt.Printf("page: %v send true\n", page)
 						c <- true
 					}
