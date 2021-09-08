@@ -111,47 +111,37 @@ func (gitlabApiClient *GitlabApiClient) FetchWithPaginationAnts(resourceUri stri
 
 	defer scheduler.Release()
 
-	// not all api return x-total header, use step concurrency
+	// not all api return x-total header, use steps
 	if total == -1 {
 		// Since the rate limit would put us at the max, we want to offset it to not hit the limit
 		conc := rateLimitPerSecond - 2 // approx: 25
 		step := 0
-		c := make(chan bool)
-		for {
-			for i := conc; i > 0; i-- {
-				page := step*conc + i
-				err := scheduler.Submit(func() error {
-					url := fmt.Sprintf(resourceUriFormat, pageSizeInt, page)
-					res, err := gitlabApiClient.Get(url, nil, nil)
-					if err != nil {
-						c <- false
-						return err
-					}
-					handlerErr := handler(res)
-					if handlerErr != nil {
-						c <- false
-						return handlerErr
-					}
-					_, err = strconv.ParseInt(res.Header.Get("X-Next-Page"), 10, 32)
-					if err != nil { // any page in current step has no next, stop
-						logger.Info("JON >>> err, stop the loop", err)
-						c <- false
-					} else if page%conc == 0 { // last page has X-Next-Page, go go go
-						fmt.Printf("page: %v send true\n", page)
-						c <- true
-					}
-					return nil
-				})
+		for i := conc; i > 0; i-- {
+			page := step*conc + i
+			err := scheduler.Submit(func() error {
+				url := fmt.Sprintf(resourceUriFormat, pageSizeInt, page)
+				res, err := gitlabApiClient.Get(url, nil, nil)
 				if err != nil {
 					return err
 				}
+				handlerErr := handler(res)
+				if handlerErr != nil {
+					return handlerErr
+				}
+				_, err = strconv.ParseInt(res.Header.Get("X-Next-Page"), 10, 32)
+				if err != nil {
+					logger.Error("Could not parse int", err)
+					return err
+				} else if page%conc == 0 {
+					fmt.Print("page: ", page)
+				}
+				return nil
+			})
+			if err != nil {
+				return err
 			}
-			cont := <-c
-			if !cont {
-				break
-			}
-			step += 1
 		}
+		step += 1
 	} else {
 		// Loop until all pages are requested
 		for i := 1; (i * pageSizeInt) <= (total + pageSizeInt); i++ {
