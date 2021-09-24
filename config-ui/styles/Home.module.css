@@ -146,11 +146,27 @@
   width: 100%;
 }
 
-.addNewStatusBtn {
+.addNewStatusBtn,
+.addNewStatusBtnDialog {
   border-radius: 3px;
   border: 1px solid rgba(0,0,0,0.15);
   padding: 0.5rem 0.5rem;
   outline: 0;
   display: inline-block;
   margin-bottom: 0.75rem;
+}
+
+.addNewStatusBtnDialog {
+  margin-top: 1rem;
+  text-align: center;
+  width: 100%;
+}
+
+.customStatusFormGroup {
+  margin-bottom: -0.5rem;
+  padding: 2rem 3rem;
+}
+
+.customStatusDialog {
+  background-color: #F4F4F6;
 }

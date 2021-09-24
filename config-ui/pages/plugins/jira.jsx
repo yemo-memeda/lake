@@ -20,10 +20,6 @@ export default function Home(props) {
   const [jiraEndpoint, setJiraEndpoint] = useState(env.JIRA_ENDPOINT)
   const [jiraBasicAuthEncoded, setJiraBasicAuthEncoded] = useState(env.JIRA_BASIC_AUTH_ENCODED)
   const [jiraIssueEpicKeyField, setJiraIssueEpicKeyField] = useState(env.JIRA_ISSUE_EPIC_KEY_FIELD)
-  const [jiraIssueTypeMapping, setJiraIssueTypeMapping] = useState(env.JIRA_ISSUE_TYPE_MAPPING)
-  const [jiraIssueBugStatusMapping, setJiraIssueBugStatusMapping] = useState(env.JIRA_ISSUE_BUG_STATUS_MAPPING)
-  const [jiraIssueIncidentStatusMapping, setJiraIssueIncidentStatusMapping] = useState(env.JIRA_ISSUE_INCIDENT_STATUS_MAPPING)
-  const [jiraIssueStoryStatusMapping, setJiraIssueStoryStatusMapping] = useState(env.JIRA_ISSUE_STORY_STATUS_MAPPING)
   const [jiraIssueStoryCoefficient, setJiraIssueStoryCoefficient] = useState(env.JIRA_ISSUE_STORYPOINT_COEFFICIENT)
   const [jiraIssueStoryPointField, setJiraIssueStoryPointField] = useState(env.JIRA_ISSUE_STORYPOINT_FIELD)
   const [jiraBoardGitlabeProjects, setJiraBoardGitlabeProjects] = useState(env.JIRA_BOARD_GITLAB_PROJECTS)
@@ -36,14 +32,13 @@ export default function Home(props) {
 
   // Status mappings state
   const [customStatusOverlay, setCustomStatusOverlay] = useState(false)
-  const [statusMappingAll, setStatusMappingAll] = useState(['bug', 'incident', 'requirement'])
   const [statusTabId, setStatusTabId] = useState(0)
-  const [statusMappingRequirementBug, setStatusMappingRequirementBug] = useState([])
-  const [statusMappingResolvedBug, setStatusMappingResolvedBug] = useState([])
-  const [statusMappingRequirementIncident, setStatusMappingRequirementIncident] = useState([])
-  const [statusMappingResolvedIncident, setStatusMappingResolvedIncident] = useState([])
-  const [statusMappingRequirementStory, setStatusMappingRequirementStory] = useState([])
-  const [statusMappingResolvedStory, setStatusMappingResolvedStory] = useState([])
+  const [statusMappingReqBug, setStatusMappingReqBug] = useState([])
+  const [statusMappingResBug, setStatusMappingResBug] = useState([])
+  const [statusMappingReqIncident, setStatusMappingReqIncident] = useState([])
+  const [statusMappingResIncident, setStatusMappingResIncident] = useState([])
+  const [statusMappingReqStory, setStatusMappingReqStory] = useState([])
+  const [statusMappingResStory, setStatusMappingResStory] = useState([])
   const [customStatus, setCustomStatus] = useState([])
   const [customStatusName, setCustomStatusName] = useState('')
 
@@ -70,32 +65,106 @@ export default function Home(props) {
     updateEnv('JIRA_BASIC_AUTH_ENCODED', jiraBasicAuthEncoded)
     updateEnv('JIRA_ISSUE_EPIC_KEY_FIELD', jiraIssueEpicKeyField)
     updateEnv('JIRA_ISSUE_TYPE_MAPPING', typeMappingAll)
-    updateEnv('JIRA_ISSUE_BUG_STATUS_MAPPING', `Required:${statusMappingRequirementBug};Resolved:${statusMappingResolvedBug};`)
-    updateEnv('JIRA_ISSUE_INCIDENT_STATUS_MAPPING', `Required:${statusMappingRequirementIncident};Resolved:${statusMappingResolvedIncident};`)
-    updateEnv('JIRA_ISSUE_STORY_STATUS_MAPPING', `Required:${statusMappingRequirementStory};Resolved:${statusMappingResolvedStory};`)
+    updateEnv('JIRA_ISSUE_BUG_STATUS_MAPPING', `Requirement:${statusMappingReqBug};Resolved:${statusMappingResBug};`)
+    updateEnv('JIRA_ISSUE_INCIDENT_STATUS_MAPPING', `Requirement:${statusMappingReqIncident};Resolved:${statusMappingResIncident};`)
+    updateEnv('JIRA_ISSUE_STORY_STATUS_MAPPING', `Requirement:${statusMappingReqStory};Resolved:${statusMappingResStory};`)
     updateEnv('JIRA_ISSUE_STORYPOINT_COEFFICIENT', jiraIssueStoryCoefficient)
     updateEnv('JIRA_ISSUE_STORYPOINT_FIELD', jiraIssueStoryPointField)
     updateEnv('JIRA_BOARD_GITLAB_PROJECTS', jiraBoardGitlabeProjects)
+
+    // Save all custom status data
+    customStatus.map(status => {
+      const requirement = status.reqValue.toString()
+      const resolved = status.resValue.toString()
+      const name = `JIRA_ISSUE_${status.name.toUpperCase()}_STATUS_MAPPING`
+      updateEnv(name, `Requirement:${requirement};Resolved:${resolved};`)
+    })
+
     setAlertOpen(true)
   }
 
   useEffect(() => {
-    const bug = 'Bug:' + typeMappingBug.toString() + ';'
-    const incident = 'Incident:' + typeMappingIncident.toString() + ';'
-    const requirement = 'Requirement:' + typeMappingRequirement.toString() + ';'
-    const all = bug + incident + requirement
+    const typeBug = 'Bug:' + typeMappingBug.toString() + ';'
+    const typeIncident = 'Incident:' + typeMappingIncident.toString() + ';'
+    const typeRequirement = 'Requirement:' + typeMappingRequirement.toString() + ';'
+    const all = typeBug + typeIncident + typeRequirement
     setTypeMappingAll(all)
   }, [typeMappingBug, typeMappingIncident, typeMappingRequirement])
 
   useEffect(() => {
-    const str = env.JIRA_ISSUE_TYPE_MAPPING;
-    const bugs = findStrBetween(str,'Bug:',';')
-    const incidents = findStrBetween(str,'Incident:',';')
-    const requirements = findStrBetween(str,'Requirement:',';')
+    // Load type & status mappings
+    const envStr = [
+      env.JIRA_ISSUE_TYPE_MAPPING,
+      env.JIRA_ISSUE_BUG_STATUS_MAPPING,
+      env.JIRA_ISSUE_INCIDENT_STATUS_MAPPING,
+      env.JIRA_ISSUE_STORY_STATUS_MAPPING
+    ]
+    const fields = [
+      {
+        tagName: 'Bug:', tagLen: 4, isStatus: false, str: envStr[0],
+        fn1: (arr) => setTypeMappingBug(arr)
+      },
+      {
+        tagName: 'Incident:', tagLen: 9, isStatus: false, str: envStr[0],
+        fn1: (arr) => setTypeMappingIncident(arr)
+      },
+      {
+        tagName: 'Story:', tagLen: 12, isStatus: false, str: envStr[0],
+        fn1: (arr) => setTypeMappingRequirement(arr)
+      },
+      {
+        tagName: 'Bug:', tagLen: null, isStatus: true, str: envStr[1],
+        fn1: (arr) => setStatusMappingReqBug(arr),
+        fn2: (arr) => setStatusMappingResBug(arr)
+      },
+      {
+        tagName: 'Incident:', tagLen: null, isStatus: true, str: envStr[2],
+        fn1: (arr) => setStatusMappingReqIncident(arr),
+        fn2: (arr) => setStatusMappingResIncident(arr)
+      },
+      {
+        tagName: 'Story:', tagLen: null, isStatus: true, str: envStr[3],
+        fn1: (arr) => setStatusMappingReqStory(arr),
+        fn2: (arr) => setStatusMappingResStory(arr)
+      },
+    ]
 
-    if (bugs) setTypeMappingBug(bugs[0].slice(4, -1).split(','))
-    if (incidents) setTypeMappingIncident(incidents[0].slice(9, -1).split(','))
-    if (requirements) setTypeMappingRequirement(requirements[0].slice(12, -1).split(','))
+    function readAndSet(tagName, tagLen, isStatus, str, fn1, fn2) {
+      if (isStatus) {
+        const strValuesReq = findStrBetween(str, 'Requirement:', ';')
+        const strValuesRes = findStrBetween(str, 'Resolved:', ';')
+
+        if (strValuesReq) fn1(strValuesReq[0].slice(12, -1).split(','))
+        if (strValuesRes) fn2(strValuesRes[0].slice(9, -1).split(','))
+      }
+      else {
+        const strValues = findStrBetween(str, tagName, ';')
+
+        if (strValues) fn1(strValues[0].slice(tagLen, -1).split(','))
+      }
+    }
+    fields.map(field => {
+      readAndSet(field.tagName, field.tagLen, field.isStatus, field.str, field.fn1, field.fn2)
+    })
+
+    //Load custom status mappings
+    for (const field in env) {
+      const bug = 'JIRA_ISSUE_BUG'
+      const incident = 'JIRA_ISSUE_INCIDENT'
+      const story = 'JIRA_ISSUE_STORY'
+      const isStatusMapping = field.includes('_STATUS_MAPPING')
+      const isNotDefault = (!field.includes(bug)) && (!field.includes(incident)) && (!field.includes(story))
+
+      if (isStatusMapping && isNotDefault) {
+        const strName = field.slice(11, -15)
+        const strValuesReq = findStrBetween(env[field], 'Requirement:', ';')
+        const strValuesRes = findStrBetween(env[field], 'Resolved:', ';')
+        const req = strValuesReq[0].slice(12, -1).split(',')
+        const res = strValuesRes[0].slice(9, -1).split(',')
+
+        setCustomStatus(customStatus => [...customStatus, {name: strName, reqValue: req || '', resValue: res || ''}])
+      }
+    }
   }, [])
 
   return (
@@ -208,52 +277,67 @@ export default function Home(props) {
               <Tabs id="StatusMappings" onChange={(id) => setStatusTabId(id)} selectedTabId={statusTabId} className={styles.statusTabs}>
                 <Tab id={0} title="Bug" panel={
                   <MappingTagStatus
-                    reqValue={statusMappingRequirementBug}
-                    resValue={statusMappingResolvedBug}
+                    reqValue={statusMappingReqBug}
+                    resValue={statusMappingResBug}
                     envName="JIRA_ISSUE_BUG_STATUS_MAPPING"
-                    clearBtnReq={<ClearButton onClick={() => setStatusMappingRequirementBug([])} />}
-                    clearBtnRes={<ClearButton onClick={() => setStatusMappingResolvedBug([])} />}
-                    onChangeReq={(values) => setStatusMappingRequirementBug(values)}
-                    onChangeRes={(values) => setStatusMappingResolvedBug(values)}
+                    clearBtnReq={<ClearButton onClick={() => setStatusMappingReqBug([])} />}
+                    clearBtnRes={<ClearButton onClick={() => setStatusMappingResBug([])} />}
+                    onChangeReq={(values) => setStatusMappingReqBug(values)}
+                    onChangeRes={(values) => setStatusMappingResBug(values)}
                   />
                 } />
                 <Tab id={1} title="Incident" panel={
                   <MappingTagStatus
-                    reqValue={statusMappingRequirementIncident}
-                    resValue={statusMappingResolvedIncident}
+                    reqValue={statusMappingReqIncident}
+                    resValue={statusMappingResIncident}
                     envName="JIRA_ISSUE_INCIDENT_STATUS_MAPPING"
-                    clearBtnReq={<ClearButton onClick={() => setStatusMappingRequirementIncident([])} />}
-                    clearBtnRes={<ClearButton onClick={() => setStatusMappingResolvedIncident([])} />}
-                    onChangeReq={(values) => setStatusMappingRequirementIncident(values)}
-                    onChangeRes={(values) => setStatusMappingResolvedIncident(values)}
-                  />
-                } panelClassName="ember-panel" />
-                <Tab id={2} title="Story" panel={
-                  <MappingTagStatus
-                    reqValue={statusMappingRequirementStory}
-                    resValue={statusMappingResolvedStory}
-                    envName="JIRA_ISSUE_STORY_STATUS_MAPPING"
-                    clearBtnReq={<ClearButton onClick={() => setStatusMappingRequirementStory([])} />}
-                    clearBtnRes={<ClearButton onClick={() => setStatusMappingResolvedStory([])} />}
-                    onChangeReq={(values) => setStatusMappingRequirementStory(values)}
-                    onChangeRes={(values) => setStatusMappingResolvedStory(values)}
+                    clearBtnReq={<ClearButton onClick={() => setStatusMappingReqIncident([])} />}
+                    clearBtnRes={<ClearButton onClick={() => setStatusMappingResIncident([])} />}
+                    onChangeReq={(values) => setStatusMappingReqIncident(values)}
+                    onChangeRes={(values) => setStatusMappingResIncident(values)}
                   />
                 } />
+                <Tab id={2} title="Story" panel={
+                  <MappingTagStatus
+                    reqValue={statusMappingReqStory}
+                    resValue={statusMappingResStory}
+                    envName="JIRA_ISSUE_STORY_STATUS_MAPPING"
+                    clearBtnReq={<ClearButton onClick={() => setStatusMappingReqStory([])} />}
+                    clearBtnRes={<ClearButton onClick={() => setStatusMappingResStory([])} />}
+                    onChangeReq={(values) => setStatusMappingResStory(values)}
+                    onChangeRes={(values) => setStatusMappingResStory(values)}
+                  />
+                } />
+
                 {customStatus.length > 0 && customStatus.map((status, i) => {
-                  return <Tab id={i + 3} title={status} panel={
-                  //   <MappingTagStatus
-                  //   reqValue={statusMappingRequirementBug}
-                  //   resValue={statusMappingResolvedBug}
-                  //   envName={`JIRA_ISSUE_${customStatus[i].toUpperCase()}_STATUS_MAPPING`}
-                  //   clearBtnReq={<ClearButton onClick={() => setStatusMappingRequirementBug([])} />}
-                  //   clearBtnRes={<ClearButton onClick={() => setStatusMappingResolvedBug([])} />}
-                  //   onChangeReq={(values) => setStatusMappingRequirementBug(values)}
-                  //   onChangeRes={(values) => setStatusMappingResolvedBug(values)}
-                  // />
-                  // TODO: finish custom status mapping
-                  <p>Custom Status {i}</p>
+                  const statusAll = customStatus.filter(obj => obj.name != status.name)
+                  const mapObj = customStatus.find(obj => obj.name === status.name)
+
+                  return <Tab id={i + 3} key={i} title={status.name} panel={
+                    <MappingTagStatus
+                      reqValue={mapObj.reqValue.length > 0 ? mapObj.reqValue : []}
+                      resValue={mapObj.resValue.length > 0 ? mapObj.resValue : []}
+                      envName={`JIRA_ISSUE_${status.name.toUpperCase()}_STATUS_MAPPING`}
+                      clearBtnReq={<ClearButton onClick={() => {
+                        mapObj.reqValue = []
+                        setCustomStatus([...statusAll, mapObj])
+                      }} />}
+                      clearBtnRes={<ClearButton onClick={() => {
+                        mapObj.resValue = []
+                        setCustomStatus([...statusAll, mapObj])
+                      }} />}
+                      onChangeReq={(values) => {
+                        mapObj.reqValue = values
+                        setCustomStatus([...statusAll, mapObj])
+                      }}
+                      onChangeRes={(values) => {
+                        mapObj.resValue = values
+                        setCustomStatus([...statusAll, mapObj])
+                      }}
+                    />
                   } />
                 })}
+
                 <Button icon="add" onClick={() => setCustomStatusOverlay(true)} className={styles.addNewStatusBtn}>Add New</Button>
 
                 <Dialog
@@ -263,25 +347,34 @@ export default function Home(props) {
                   title="Add a New Custom Status"
                   isOpen={customStatusOverlay}
                   onOpened={() => setCustomStatusName('')}
+                  autoFocus={false}
+                  className={styles.customStatusDialog}
                 >
                   <div className={Classes.DIALOG_BODY}>
-                  <FormGroup
-                    // label="Enter "
-                    // inline={true}
-                    // helperText="JIRA_ENDPOINT"
-                    // labelFor="custom-status"
-                    className={styles.formGroup}
-                    contentClassName={styles.formGroup}
-                  >
-                    <InputGroup
-                      id="custom-status"
-                      placeholder="Enter custom status name"
-                      defaultValue={customStatusName}
-                      onChange={(e) => setCustomStatusName(e.target.value)}
-                      className={styles.input}
-                    />
-                    <Button icon="add" onClick={() => setCustomStatus([...customStatus, customStatusName])} className={styles.addNewStatusBtn}>Add New</Button>
-                  </FormGroup>
+                  <form onSubmit={(e) => {
+                    e.preventDefault()
+                    setCustomStatus([...customStatus, {name: customStatusName, reqValue: '', resValue: ''}])
+                    setCustomStatusOverlay(false)
+                  }}>
+                    <FormGroup
+                      className={styles.formGroup}
+                      className={styles.customStatusFormGroup}
+                    >
+                      <InputGroup
+                        id="custom-status"
+                        placeholder="Enter custom status name"
+                        onChange={(e) => setCustomStatusName(e.target.value)}
+                        className={styles.customStatusInput}
+                        autoFocus={true}
+                      />
+                      <Button icon="add" onClick={() => {
+                          setCustomStatus([...customStatus, {name: customStatusName, reqValue: '', resValue: ''}])
+                          setCustomStatusOverlay(false)
+                        }}
+                        className={styles.addNewStatusBtnDialog}
+                        onSubmit={(e) => e.preventDefault()}>Add New</Button>
+                    </FormGroup>
+                  </form>
                   </div>
                 </Dialog>
 
@@ -321,29 +414,6 @@ export default function Home(props) {
             <div className={styles.headlineContainer}>
               <h3 className={styles.headline}>Additional Customization Settings</h3>
               <p className={styles.description}>Additional Jira settings</p>
-            </div>
-
-            <div className={styles.formContainer}>
-              <FormGroup
-                inline={true}
-                labelFor="jira-story-status-mapping"
-                helperText="JIRA_ISSUE_STORY_STATUS_MAPPING"
-                className={styles.formGroup}
-                contentClassName={styles.formGroup}
-              >
-                <Tooltip content="Map your custom story status to Devlake standard status" position={Position.TOP}>
-                  <Label>
-                    Issue&nbsp;Story
-                    <InputGroup
-                      id="jira-story-status-mapping"
-                      placeholder="<STANDARD_STATUS_1>:<ORIGIN_STATUS_1>,<ORIGIN_STATUS_2>;<STANDARD_STATUS_2>"
-                      defaultValue={jiraIssueStoryStatusMapping}
-                      onChange={(e) => setJiraIssueStoryStatusMapping(e.target.value)}
-                      className={styles.input}
-                    />
-                  </Label>
-                </Tooltip>
-              </FormGroup>
             </div>
 
             <div className={styles.formContainer}>
