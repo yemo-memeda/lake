@@ -1,5 +1,5 @@
 import { Tooltip, Position, FormGroup, Label, Tag, TagInput } from '@blueprintjs/core'
-import styles from '../styles/Home.module.css'
+import styles from '../../../styles/Home.module.css'
 
 const MappingTag = ({labelIntent, labelName, onChange, rightElement, helperText, values}) => {
   return <>

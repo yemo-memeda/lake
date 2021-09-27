@@ -1,6 +1,7 @@
 module.exports = {
   // reactStrictMode: true,
   // basePath: '/',
+  pageExtensions: ["index.jsx"],
 
   webpack: (config, { isServer }) => {
     if (!isServer) {
@@ -8,4 +9,7 @@ module.exports = {
     }
     return config;
   },
+}
+module.exports = {
+
 }
