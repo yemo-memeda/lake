@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"path"
 	"time"
 
 	"github.com/merico-dev/lake/logger"
@@ -78,7 +79,7 @@ func (apiClient *ApiClient) SetProxy(proxyUrl string) error {
 	if err != nil {
 		return err
 	}
-	if pu.Scheme == "http" || pu.Scheme == "socks5"{
+	if pu.Scheme == "http" || pu.Scheme == "socks5" {
 		apiClient.client.Transport = &http.Transport{Proxy: http.ProxyURL(pu)}
 	}
 	return nil
@@ -86,20 +87,34 @@ func (apiClient *ApiClient) SetProxy(proxyUrl string) error {
 
 func (apiClient *ApiClient) Do(
 	method string,
-	path string,
+	pathSuffix string,
 	query *url.Values,
 	body *map[string]interface{},
 	headers *map[string]string,
 ) (*http.Response, error) {
-	uri := apiClient.endpoint + path
+	logger.Info("JON >>> apiClient.endpoint", apiClient.endpoint) //github.com/api
+	logger.Info("JON >>> pathSuffix", pathSuffix)                 // repos/commits?page=1&size=10
+	logger.Info("JON >>> query", query)                           // nil
+
+	u, err := url.Parse(apiClient.endpoint)
+	if err != nil {
+		logger.Error("ERROR: Could not parse url", err)
+	}
+	logger.Info("JON >>> u.Path", u.Path)
+	u.Path = path.Join(u.Path, pathSuffix)
+	logger.Info("JON >>> u", u)
+	uri := u.String()
+	logger.Info("JON >>> uri", uri)
 
 	// append query
 	if query != nil {
 		queryString := query.Encode()
 		if queryString != "" {
 			uri += "?" + queryString
+			logger.Info("JON >>> uri-appended", uri)
 		}
 	}
+	logger.Info("JON >>> uri", uri)
 
 	// process body
 	var reqBody io.Reader

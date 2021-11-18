@@ -78,6 +78,7 @@ func (githubApiClient *GithubApiClient) RunConcurrently(resourceUriFormat string
 			page := step*conc + i
 			err := scheduler.Submit(func() error {
 				url := fmt.Sprintf(resourceUriFormat, page, pageSize)
+				// TODO: add query in here
 				res, err := githubApiClient.Get(url, nil, nil)
 				if err != nil {
 					return err

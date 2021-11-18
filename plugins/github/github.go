@@ -74,6 +74,7 @@ func (plugin Github) Execute(options map[string]interface{}, progress chan<- flo
 			"enrichIssues":   true,
 		}
 	}
+
 	repoId, collectRepoErr := tasks.CollectRepository(ownerString, repositoryNameString, githubApiClient)
 	if collectRepoErr != nil {
 		return fmt.Errorf("Could not collect repositories: %v", collectRepoErr)
