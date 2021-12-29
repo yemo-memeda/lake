@@ -13,6 +13,7 @@ import (
 	"github.com/merico-dev/lake/plugins/feishu/apimodels"
 	"github.com/merico-dev/lake/plugins/feishu/models"
 	"github.com/merico-dev/lake/utils"
+	"github.com/mitchellh/mapstructure"
 	"net/http"
 	"net/url"
 	"os"
@@ -23,15 +24,27 @@ import (
 
 type Feishu string
 
+type FeishuOptions struct {
+	// 需要收集多久的数据
+	// how long do you want to collect
+	MeetingCollectDayNum int `json:"meetingCollectDayNum"`
+}
+
 func (plugin Feishu) Description() string {
 	return "To collect and enrich data from Feishu"
 }
 
-func (plugin Feishu) Execute(options map[string]interface{}, progress chan<- float32, ctx context.Context) error {
+func (plugin Feishu) Execute(options map[string]interface{}, progress chan<- float32, ctx context.Context) error { // process options
+	var op FeishuOptions
+	err := mapstructure.Decode(options, &op)
+	if err != nil {
+		return err
+	}
+	if op.MeetingCollectDayNum == 0 {
+		op.MeetingCollectDayNum = 120
+	}
+
 	logger.Print("start feishu plugin execution")
-	// 需要收集多久的数据
-	// how long do you want to collect
-	collectDayNum := 120
 
 	// 内部应用 tenant_access_token 管理器
 	// tenant_access_token manager
@@ -77,7 +90,7 @@ func (plugin Feishu) Execute(options map[string]interface{}, progress chan<- flo
 	endDate = endDate.Truncate(24 * time.Hour)
 	startDate := endDate.AddDate(0, 0, -1)
 	progress <- 0.3
-	for i := 0; i < collectDayNum; i++ {
+	for i := 0; i < op.MeetingCollectDayNum; i++ {
 		params := url.Values{}
 		params.Add(`start_time`, strconv.FormatInt(startDate.Unix(), 10))
 		params.Add(`end_time`, strconv.FormatInt(endDate.Unix(), 10))
